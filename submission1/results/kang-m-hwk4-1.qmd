@@ -1,0 +1,182 @@
+---
+title: "Homework 4: Submission 1"
+author: "Mathew Kang"
+execute:
+  echo: false
+  warning: false
+format: 
+  pdf:
+    mainfont: "Arial"
+    geometry:
+      - margin=1in
+    include-in-header:
+      text: |
+        \usepackage{float}
+---
+
+```{r}
+#| include: false
+
+# Preliminaries -----------------------------------------------------------
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, haven, modelsummary, scales, broom, fixest, kableExtra, knitr)
+
+# Load dataset -----------------------------------------------------------
+HCRIS_data <- read_tsv("../../data/output/HCRIS_Data.txt")
+v96 <- read_tsv('../../data/output/HCRIS_Data_v1996.txt')
+v10 <- read_tsv('../../data/output/HCRIS_Data_v2010.txt')
+
+# Hold table function for modelsummary table formatting -----------------
+hold_table <- function(x) {
+  cat(gsub("\\\\begin\\{table\\}", "\\\\begin\\{table\\}[H]", x))
+}
+```
+
+## Question 1
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+source("../../submission1/data-code/q1.R")
+
+q1
+```
+
+## Question 2
+
+```{r}
+source("../../submission1/data-code/q2.R")
+
+q2
+```
+\newpage
+
+## Question 3
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+source("../../submission1/data-code/q3.R")
+
+q3.plot
+```
+
+## Question 4
+
+```{r}
+#| fig-width: 8
+#| fig-height: 5
+
+source("../../submission1/data-code/q4.R")
+
+q4.plot
+```
+
+## Question 5
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+source("../../submission1/data-code/q5.R")
+
+q5.plot
+```
+
+```{r}
+#| include: false
+
+# Include price in the original dataframe -------------------------------------
+IV_data <- HCRIS_data %>%
+  filter(year >= 2009 & year <= 2019) %>%
+  filter(if_all(c(tot_discounts, tot_charges, ip_charges, icu_charges, ancillary_charges, tot_mcare_payment, tot_discharges, mcare_discharges), ~ !is.na(.))) %>%
+  mutate(
+    discount_factor = 1 - (tot_discounts / tot_charges),
+    price_num = (ip_charges + icu_charges + ancillary_charges) * discount_factor - tot_mcare_payment,
+    price_denom = tot_discharges - mcare_discharges
+  ) %>%
+  filter(price_denom > 0) %>%
+  mutate(price = price_num / price_denom) %>%
+  filter(price > 0)
+
+# Prepare dataframe for OLS estimates -------------------------------------
+hcris.price <- IV_data %>%
+  filter(year %in% c(2011, 2014)) %>%
+  select(provider_number, price, year) %>%
+  pivot_wider(names_from = year, values_from = price, names_prefix = "price_")
+
+hcris.penalty <- IV_data %>%
+  filter(year == 2012) %>%
+  mutate(net_penalty = (replace_na(hrrp_payment, 0) - replace_na(hvbp_payment, 0))/1000) %>%
+  select(provider_number, net_penalty)
+
+hcris.mcare <- HCRIS_data %>%
+  filter(year < 2012) %>%
+  group_by(provider_number) %>%
+  summarize(avg_mcare = mean(mcare_discharges, na.rm = TRUE)/100) %>%
+  ungroup()
+
+hcris.mcaid <- IV_data %>%
+  filter(year >= 2009 & year <= 2011) %>%
+  group_by(provider_number) %>%
+  summarize(
+    avg_beds = mean(beds, na.rm = TRUE),
+    avg_medicaid = mean(mcaid_discharges, na.rm = TRUE)
+  )
+
+hcris.final <- hcris.price %>%
+  left_join(hcris.penalty, by = "provider_number") %>%
+  left_join(hcris.mcaid, by = "provider_number") %>%
+  left_join(hcris.mcare, by = "provider_number") %>%
+  filter(!is.na(price_2011), !is.na(price_2014)) %>%
+  mutate(price_change = price_2014 - price_2011)
+```
+
+
+## Question 6
+
+```{r}
+#| results: asis
+
+source("../../submission1/data-code/q6.R")
+
+hold_table(q6)
+```
+
+## Question 7
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+source("../../submission1/data-code/q7.R")
+
+q7
+```
+
+## Question 8
+
+```{r}
+#| results: asis
+
+source("../../submission1/data-code/q8.R")
+
+hold_table(q8.1)
+hold_table(q8.2)
+```
+
+## Question 9
+
+```{r}
+#| results: asis
+
+source("../../submission1/data-code/q9.R")
+
+hold_table(q9)
+```
+
+## Question 10
+
+When using prior Medicare discharges as the study instrument, the "local" ATE (LATE) measures the effect for "compliers," or hospitals whose penalty was determined by their pre-2012 Medicare volume, on the change in price per discharge (2011-2014). On the other hand, the ATE obtained from the OLS regression models measure the effect of the treatment, 2012 net penalties, on the aforementioned outcome. There are potentially two main drivers for the difference in estimates. First, the OLS regression understates the true effect by including wealthy, specialty hospitals that can easily absorb penalties without changing prices. Meanwhile, the LATE specifically capturing hospitals with large Medicare volumes implies larger estimates, since these hospitals do not have large cash reserves and must raise prices to continue operations. Second, the treatment is endogenous: penalties affect prices, and the opposite may be true when considering that large investments in quality improvement can reduce readmission rates.
