@@ -38,7 +38,7 @@ hold_table <- function(x) {
 #| fig-width: 7
 #| fig-height: 4
 
-source("../../submission1/data-code/q1.R")
+source("../../submission1/analysis/q1.R")
 
 q1
 ```
@@ -46,7 +46,7 @@ q1
 ## Question 2
 
 ```{r}
-source("../../submission1/data-code/q2.R")
+source("../../submission1/analysis/q2.R")
 
 q2
 ```
@@ -58,7 +58,7 @@ q2
 #| fig-width: 7
 #| fig-height: 4
 
-source("../../submission1/data-code/q3.R")
+source("../../submission1/analysis/q3.R")
 
 q3.plot
 ```
@@ -69,7 +69,7 @@ q3.plot
 #| fig-width: 8
 #| fig-height: 5
 
-source("../../submission1/data-code/q4.R")
+source("../../submission1/analysis/q4.R")
 
 q4.plot
 ```
@@ -80,7 +80,7 @@ q4.plot
 #| fig-width: 7
 #| fig-height: 4
 
-source("../../submission1/data-code/q5.R")
+source("../../submission1/analysis/q5.R")
 
 q5.plot
 ```
@@ -109,29 +109,21 @@ hcris.price <- IV_data %>%
 
 hcris.penalty <- IV_data %>%
   filter(year == 2012) %>%
-  mutate(net_penalty = (replace_na(hrrp_payment, 0) - replace_na(hvbp_payment, 0))/1000) %>%
+  mutate(net_penalty = (replace_na(hrrp_payment, 0) - replace_na(hvbp_payment, 0))) %>%
   select(provider_number, net_penalty)
 
-hcris.mcare <- HCRIS_data %>%
-  filter(year < 2012) %>%
-  group_by(provider_number) %>%
-  summarize(avg_mcare = mean(mcare_discharges, na.rm = TRUE)/100) %>%
-  ungroup()
-
-hcris.mcaid <- IV_data %>%
+hcris.avgs <- HCRIS_data %>%
   filter(year >= 2009 & year <= 2011) %>%
   group_by(provider_number) %>%
-  summarize(
-    avg_beds = mean(beds, na.rm = TRUE),
-    avg_medicaid = mean(mcaid_discharges, na.rm = TRUE)
-  )
+  summarize(avg_mcare = mean(mcare_discharges, na.rm = TRUE),
+            avg_beds = mean(beds, na.rm = TRUE),
+            avg_medicaid = mean(mcaid_discharges, na.rm = TRUE))
 
 hcris.final <- hcris.price %>%
-  left_join(hcris.penalty, by = "provider_number") %>%
-  left_join(hcris.mcaid, by = "provider_number") %>%
-  left_join(hcris.mcare, by = "provider_number") %>%
+  inner_join(hcris.penalty, by = "provider_number") %>%
+  inner_join(hcris.avgs, by = "provider_number") %>%
   filter(!is.na(price_2011), !is.na(price_2014)) %>%
-  mutate(price_change = price_2014 - price_2011)
+  mutate(price_change = (price_2014 - price_2011))
 ```
 
 
@@ -140,7 +132,7 @@ hcris.final <- hcris.price %>%
 ```{r}
 #| results: asis
 
-source("../../submission1/data-code/q6.R")
+source("../../submission1/analysis/q6.R")
 
 hold_table(q6)
 ```
@@ -151,7 +143,7 @@ hold_table(q6)
 #| fig-width: 7
 #| fig-height: 4
 
-source("../../submission1/data-code/q7.R")
+source("../../submission1/analysis/q7.R")
 
 q7
 ```
@@ -161,7 +153,7 @@ q7
 ```{r}
 #| results: asis
 
-source("../../submission1/data-code/q8.R")
+source("../../submission1/analysis/q8.R")
 
 hold_table(q8.1)
 hold_table(q8.2)
@@ -172,7 +164,7 @@ hold_table(q8.2)
 ```{r}
 #| results: asis
 
-source("../../submission1/data-code/q9.R")
+source("../../submission1/analysis/q9.R")
 
 hold_table(q9)
 ```

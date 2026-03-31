@@ -10,7 +10,8 @@ iv_models <- list(
 q9 <- modelsummary(iv_models,
                    stars = TRUE,
                    title = "2SLS Estimates: Effect of Net Penalty on Price Changes (2011-2014)",
-                   coef_map = c("fit_net_penalty" = "Net Penalty ($1k)",
+                   coef_map = c("(Intercept)" = "Intercept",
+                     "fit_net_penalty" = "Net Penalty ($1k)",
                                 "avg_beds" = "Avg. Beds",
                                 "avg_medicaid" = "Avg. Medicaid Discharges"),
                    gof_map = c("nobs", "f.stat_first" = "F-Stat (First Stage)"))
