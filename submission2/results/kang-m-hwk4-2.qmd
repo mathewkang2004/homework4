@@ -43,6 +43,8 @@ hold_table <- function(x) {
 ## Question 1
 
 ```{r}
+#| label: fig-q1
+#| fig-cap: "Hospitals That Filed More Than One Report In The Same Year (2009-2019)"
 #| fig-width: 7
 #| fig-height: 4
 
@@ -51,18 +53,32 @@ source("../../submission2/analysis/q1.R")
 q1
 ```
 
+For this question, because the final HCRIS dataframe contains only unique reports, I used the raw HCRIS data files for versions 1996 and 2010. @fig-q1 presents the number of hospitals that filed more than one report in the same year, which shows a noticeable decrease in reporting from 2009 to 2011 before increasing again in 2012.
+
+\newpage
+
 ## Question 2
 
 ```{r}
+#| label: fig-q2
+#| fig-cap: "Number of Unique Hospital IDs Over Time (2009-2019)"
+#| fig-width: 7
+#| fig-height: 4
+
 source("../../submission2/analysis/q2.R")
 
 q2
 ```
+
+After cleaning the raw data files for versions 1996 and 2010 to include only unique reports, I counted the number of unique provider numbers, which corresponds to unique hospitals. In total, there are **6,861** unique hospital IDs in the data. @fig-q2 presents changes in the number of unique hospital IDs over time. While there is a dramatic increase from 2009 to 2010, the number of unique IDs appears to remain stable afterwards.
+
 \newpage
 
 ## Question 3
 
 ```{r}
+#| label: fig-q3
+#| fig-cap: "Distribution of Total Charges Per Year (2009-2019)"
 #| fig-width: 7
 #| fig-height: 4
 
@@ -71,9 +87,15 @@ source("../../submission2/analysis/q3.R")
 q3.plot
 ```
 
+@fig-q3 presents the distribution of total charges per year, excluding the top and bottom 1%. The median of distributions per year are marked in orange, showing a very small increase in total charges over time.
+
+\newpage
+
 ## Question 4
 
 ```{r}
+#| label: fig-q4
+#| fig-cap: "Distribution of Estimated Hospital Prices By Year (2009-2019)"
 #| fig-width: 8
 #| fig-height: 5
 
@@ -82,9 +104,15 @@ source("../../submission2/analysis/q4.R")
 q4.plot
 ```
 
+@fig-q4 presents the distribution of estimated prices per year, excluding the top and bottom 5%. Impossible values, such as hospitals having more Medicare discharges than total discharges, were also excluded. While the median estimated prices appear to be stable over time, the maximum prices are observed to increase.
+
+\newpage
+
 ## Question 5
 
 ```{r}
+#| label: fig-q5
+#| fig-cap: "Share of Hospitals Penalized (2012-2019)"
 #| fig-width: 7
 #| fig-height: 4
 
@@ -92,6 +120,8 @@ source("../../submission2/analysis/q5.R")
 
 q5.plot
 ```
+
+@fig-q5 presents the share of hospitals that were penalized from 2012 to 2019. This is stratified such that the percentage of hospitals affected by HRRP, VBP, or both are shown.
 
 ```{r}
 #| include: false
@@ -133,6 +163,7 @@ hcris.final <- hcris.price %>%
   filter(!is.na(price_change), !is.na(net_penalty), !is.na(avg_mcare))
 ```
 
+\newpage
 
 ## Question 6
 
@@ -143,6 +174,8 @@ source("../../submission2/analysis/q6.R")
 
 hold_table(q6)
 ```
+
+\newpage
 
 ## Question 7
 

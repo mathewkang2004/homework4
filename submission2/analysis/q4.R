@@ -22,9 +22,10 @@ q4 <- HCRIS_data %>%
 # Plot data ---------------------------------------------------------------
 q4.plot <- ggplot(q4, aes(x = factor(year), y = price)) +
   geom_violin(fill = "darkblue", color = "darkblue", alpha = 0.7, draw_quantiles = c(0.25, 0.5, 0.75)) +
+  stat_summary(fun = median, geom = "line", aes(group = 1), color = "orange", size = 1.2) +
+  stat_summary(fun = median, geom = "point", color = "orange", size = 3) +
   scale_y_continuous(labels = label_comma()) +
   labs(
-    title = "Distribution of Estimated Hospital Prices By Year",
     x = "Year",
     y = "Estimated Price per Discharge"
   ) +

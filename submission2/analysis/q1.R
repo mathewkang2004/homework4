@@ -18,9 +18,8 @@ q1 <- ggplot(duplicates, aes(x = year, y = num_hospitals_multi)) +
   geom_line(color = "darkblue", size = 1) +
   geom_point(color = "darkblue", size = 3) +
   scale_x_continuous(breaks = 2009:2019) +
+  coord_cartesian(ylim = c(0, 200)) +
   labs(
-    title = "Hospitals That Filed More Than One Report In The Same Year",
-    subtitle = "2009-2019",
     x = "Year",
     y = "Number of Hospitals"
   ) +
