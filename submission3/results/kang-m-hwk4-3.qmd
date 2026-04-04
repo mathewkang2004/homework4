@@ -1,0 +1,234 @@
+---
+title: "Homework 4: Submission 3"
+author: "Mathew Kang"
+execute:
+  echo: false
+  warning: false
+format: 
+  pdf:
+    mainfont: "Arial"
+    geometry:
+      - margin=1in
+    include-in-header:
+      text: |
+        \usepackage{float}
+---
+
+```{r}
+#| include: false
+
+# Preliminaries -----------------------------------------------------------
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, haven, modelsummary, scales, broom, fixest, kableExtra, knitr)
+
+# Load dataset -----------------------------------------------------------
+v96 <- read_tsv('../../data/output/HCRIS_Data_v1996.txt')
+v10 <- read_tsv('../../data/output/HCRIS_Data_v2010.txt')
+
+year <- 2009:2019
+
+HCRIS_data <- year %>%
+  map_dfr(~ {
+    file_path <- paste0("../../data/output/data-", .x, ".csv")
+    read_csv(file_path, col_types = cols(.default = "c")) %>%
+      mutate(across(c(tot_discounts, tot_charges, ip_charges, icu_charges, ancillary_charges, tot_mcare_payment, tot_discharges, mcare_discharges, hrrp_payment, year, hvbp_payment, mcaid_discharges, beds), as.numeric))
+  })
+
+# Hold table function for modelsummary table formatting -----------------
+hold_table <- function(x) {
+  cat(gsub("\\\\begin\\{table\\}", "\\\\begin\\{table\\}[H]", x))
+}
+```
+
+# Summarizing The Data
+
+## Question 1
+
+```{r}
+#| label: fig-q1
+#| fig-cap: "Hospitals That Filed More Than One Report In The Same Year (2009-2019)"
+#| fig-width: 7
+#| fig-height: 4
+
+source("../../submission3/analysis/q1.R")
+
+q1
+```
+
+For this question, because the final HCRIS dataframe contains only unique reports, I used the raw HCRIS data files for versions 1996 and 2010. @fig-q1 presents the number of hospitals that filed more than one report in the same year, which shows a noticeable decrease in reporting from 2009 to 2011 before increasing again in 2012.
+
+\newpage
+
+## Question 2
+
+```{r}
+#| label: fig-q2
+#| fig-cap: "Number of Unique Hospital IDs Over Time (2009-2019)"
+#| fig-width: 7
+#| fig-height: 4
+
+source("../../submission3/analysis/q2.R")
+
+q2
+```
+
+After cleaning the raw data files for versions 1996 and 2010 to include only unique reports, I counted the number of unique provider numbers, which corresponds to unique hospitals. In total, there are **6,861** unique hospital IDs in the data. @fig-q2 presents changes in the number of unique hospital IDs over time. While there is a dramatic increase from 2009 to 2010, the number of unique IDs appears to remain stable afterwards.
+
+\newpage
+
+## Question 3
+
+```{r}
+#| label: fig-q3
+#| fig-cap: "Distribution of Total Charges Per Year (2009-2019)"
+#| fig-width: 7
+#| fig-height: 4
+
+source("../../submission3/analysis/q3.R")
+
+q3.plot
+```
+
+@fig-q3 presents the distribution of total charges per year, excluding the top and bottom 1%. The median of distributions per year are marked in orange, showing a very small increase in total charges over time.
+
+\newpage
+
+## Question 4
+
+```{r}
+#| label: fig-q4
+#| fig-cap: "Distribution of Estimated Hospital Prices By Year (2009-2019)"
+#| fig-width: 8
+#| fig-height: 5
+
+source("../../submission3/analysis/q4.R")
+
+q4.plot
+```
+
+@fig-q4 presents the distribution of estimated prices per year, excluding the top and bottom 5%. Impossible values, such as hospitals having more Medicare discharges than total discharges, were also excluded. While the median estimated prices appear to be stable over time, the maximum prices are observed to increase.
+
+\newpage
+
+## Question 5
+
+```{r}
+#| label: fig-q5
+#| fig-cap: "Share of Hospitals Penalized (2012-2019)"
+#| fig-width: 7
+#| fig-height: 4
+
+source("../../submission3/analysis/q5.R")
+
+q5.plot
+```
+
+@fig-q5 presents the share of hospitals that were penalized from 2012 to 2019. This is stratified such that the percentage of hospitals affected by HRRP, VBP, or both are shown.
+
+```{r}
+#| include: false
+
+# Include price in the original dataframe -------------------------------------
+IV_data <- HCRIS_data %>%
+  filter(if_all(c(tot_discounts, tot_charges, ip_charges, icu_charges, ancillary_charges, tot_mcare_payment, tot_discharges, mcare_discharges), ~ !is.na(.))) %>%
+  mutate(
+    discount_factor = 1 - (tot_discounts / tot_charges),
+    price_num = (ip_charges + icu_charges + ancillary_charges) * discount_factor - tot_mcare_payment,
+    price_denom = tot_discharges - mcare_discharges
+  ) %>%
+  filter(price_denom > 0) %>%
+  mutate(price = price_num / price_denom) %>%
+  filter(price > 0 & price < quantile(price, 0.99, na.rm = TRUE))
+
+# Prepare dataframe for OLS estimates -------------------------------------
+hcris.price <- IV_data %>%
+  filter(year %in% c(2011, 2014)) %>%
+  select(provider_number, price, year) %>%
+  pivot_wider(names_from = year, values_from = price, names_prefix = "price_")
+
+hcris.penalty <- IV_data %>%
+  filter(year == 2012) %>%
+  mutate(net_penalty = (replace_na(hvbp_payment,0) - replace_na(hrrp_payment, 0))/1000) %>%
+  select(provider_number, net_penalty)
+
+hcris.avgs <- HCRIS_data %>%
+  filter(year >= 2009 & year <= 2011) %>%
+  group_by(provider_number) %>%
+  summarize(avg_mcare = mean(mcare_discharges, na.rm = TRUE)/100,
+            avg_beds = mean(beds, na.rm = TRUE)/100,
+            avg_medicaid = mean(mcaid_discharges, na.rm = TRUE)/100)
+
+hcris.final <- hcris.price %>%
+  inner_join(hcris.penalty, by = "provider_number") %>%
+  inner_join(hcris.avgs, by = "provider_number") %>%
+  mutate(price_change = (price_2014 - price_2011)) %>%
+  filter(!is.na(price_change), !is.na(net_penalty), !is.na(avg_mcare))
+```
+
+\newpage
+
+# Estimate ATEs
+
+For this portion of the assignment, I applied the same formula for prices as question 4, except I also filtered the top 1% of prices to manage outliers in the data. The rationale for this filter lies in the formula: the denominator for price is set to be the difference between total discharges and Medicare discharges. This corrupts the estimated price for hospitals with Medicare discharges similar to their total discharges (e.g., 10,000 total discharges and 9,900 Medicare discharges). This dramatically inflates their estimated price that may not reflect what they're actually charging, creating a spurious relationship between Average Medicare discharges and price changes. Therefore, I argue that removing these observations altogether, albeit sacrificing a few hospitals that may actually be charging exorbitant prices, may lead to average treatment effects that are closer to true price changes.
+
+Besides that, I applied the same cross-sectional analysis framework of price changes from 2011 to 2014 as shown in class, ensuring that all NA observations for HRRP and VBP payments are set to 0 to complete the calculations. Net penalties are set to be VBP payments minus HRRP payments. Thus, a negative penalty associated with a hospital suggests that they were penalized, since their HRRP payments are greater than their VBP payments. Net penalties are divided by 1,000, average beds are divided by 100, and average Medicaid and Medicare discharges are divided by 100 for coefficient readability. Coefficients were also rounded to the hundredths digit to reflect penny increments.
+
+## Question 6
+
+```{r}
+#| results: asis
+
+source("../../submission3/analysis/q6.R")
+
+hold_table(q6)
+```
+
+Table 1 presents the OLS estimates of the treatment (net penalty) on the outcome (price changes from 2011 to 2014). Under baseline conditions, every \$1,000 increase in net penalties, meaning the hospital is penalized less by HRRP, is associated with a $3.21 reduction in prices that is statistically significant. This reduction tapers off when controlling for the size of the hospital (average beds). In fact, changes in price become negligible when including average Medicaid discharges in the model, suggesting that the simple, baseline regression overstates the reduction in price.
+
+However, as it is later shown in the two-stage least squares (2SLS) model, the OLS models may not provide informative estimates, since exposure to net penalties may be endogenous.
+
+## Question 7
+
+```{r}
+#| label: fig-q7
+#| fig-cap: "HRRP + VBP Penalties vs. Pre-Period Medicare Volume"
+#| fig-width: 7
+#| fig-height: 4
+
+source("../../submission3/analysis/q7.R")
+
+q7
+```
+
+@fig-q7 presents the trend between net penalty (in thousand dollar increments) and average, pre-2012 Medicare discharges (per 100 discharges). Before the structural shift to "pay-for-performance" models, some hospitals were hit with harsher penalties as average Medicare discharges increased. However, there is also a significant portion of hospitals that weren't given penalties, even though discharges increased. Nevertheless, the fact that there is heteroskedasticity indicates that there is a first stage effect.
+
+## Question 8
+
+```{r}
+#| results: asis
+
+source("../../submission3/analysis/q8.R")
+
+hold_table(q8.1)
+hold_table(q8.2)
+```
+
+Table 2 shows the first stage estimates of the effect of the instrument (pre-2012 Medicare volume) on net penalties. For every 100-discharge increase in average Medicare discharges, the net penalty significantly decreases by \$420 $(-0.42 \times 1000 = 420)$, supporting the assumption of relevance. This reduction remains stable when controlling for the size of the hospital and average Medicaid discharges.
+
+Table 3 presents the total, estimated effect of pre-2012 Medicare volume on price changes. The non-zero coefficients indicate that the instrument and the outcome are related, validating the use of 2SLS regressions shown in question 9.
+
+## Question 9
+
+```{r}
+#| results: asis
+
+source("../../submission3/analysis/q9.R")
+
+hold_table(q9)
+```
+
+Table 4 presents the estimated effect of net penalties on price changes, using 2SLS regression models. Under baseline conditions, every \$1,000 increase in net penalties leads to a \$4.38 reduction in prices. However, this is not statistically significant, suggesting that these price changes are negligible.
+
+## Question 10
+
+When using prior Medicare discharges as the study instrument, the "local" ATE (LATE) measures the effect for "compliers," or hospitals whose penalty was determined by their pre-2012 Medicare volume, on the change in price per discharge (2011-2014). On the other hand, the ATE obtained from the OLS regression models measure the effect of the treatment, 2012 net penalties, on the aforementioned outcome. The LATE demonstrates that the overall ATE obtained from the OLS models does not accurately reflect the true causal relationship between net penalties and price changes. This is because net penalties are dependent on readmissions and care quality, which are themselves correlated with other factors (e.g., financial health of a given hospital) that also influence prices. In other words, net penalties are endogenous; by predicting net penalties using only the variation explained by pre-2012 Medicare volume first, these predicted penalty values used to estimate the effect on price change will only contain exogenous variation driven by Medicare volume. Ultimately, it is observed from the LATE that there is no significant causal relationship between net penalties and price changes with this 2-step regression.
